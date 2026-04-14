@@ -34,7 +34,6 @@ Regras:
 ### Passo 3 — Confirmar antes de enviar
 Mostre um resumo legível e pergunte se está correto:
 
-```text
 📋 Leads encontrados:
 
 1. João Silva
@@ -49,7 +48,7 @@ Mostre um resumo legível e pergunte se está correto:
 
 "Está correto? Posso enviar ao ClickUp"
 
-Passo 4 — Enviar ao ClickUp
+### Passo 4 — Extrair os leads
 Após confirmação, chame run_js com index.html para CADA lead individualmente,
 passando um JSON com: evento, nome, telefone, email, site, observacao.
 
