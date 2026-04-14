@@ -1,116 +1,201 @@
 <!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-</head>
-<body>
-<script>
-(async () => {
-  const PROXY_URL = 'https://SUACONTA.vercel.app/api/leads';
-  const API_KEY = 'SUA_CHAVE_AQUI';
-  const QUEUE_KEY = 'tec4u_leads_queue';
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TEC4U Leads</title>
+  </head>
+  <body>
+    <script>
+      const PROXY_URL = "https://SEU-PROJETO.vercel.app/api/lead";
+      const API_KEY = "SUA CHAVE DE API AQUI";
+      const QUEUE_KEY = "tec4u_leads_queue_v1";
 
-  const params = new URLSearchParams(window.location.search);
-  let lead;
-  try {
-    lead = JSON.parse(decodeURIComponent(params.get('data') || '{}'));
-  } catch {
-    document.body.innerText = JSON.stringify({ status: 'error', message: 'Dados inválidos recebidos.' });
-    return;
-  }
-
-  function loadQueue() {
-    try { return JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]'); }
-    catch { return []; }
-  }
-
-  function saveQueue(queue) {
-    localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
-  }
-
-  async function sendLead(leadData) {
-    const res = await fetch(PROXY_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': API_KEY
-      },
-      body: JSON.stringify(leadData),
-      signal: AbortSignal.timeout(8000)
-    });
-
-    const json = await res.json();
-
-    if (res.status === 429) {
-      return {
-        status: 'rate_limit',
-        message: json.error,
-        enviados_hoje: json.enviados_hoje,
-        limite: json.limite
-      };
-    }
-
-    if (res.status === 401) {
-      return {
-        status: 'auth_error',
-        message: json.error
-      };
-    }
-
-    if (!res.ok) {
-      throw new Error(json.error || `HTTP ${res.status}`);
-    }
-
-    return {
-      status: 'ok',
-      message: json.message,
-      enviados_hoje: json.enviados_hoje,
-      limite_diario: json.limite_diario,
-      task_id: json.task_id
-    };
-  }
-
-  async function flushQueue() {
-    const queue = loadQueue();
-    if (!queue.length) return;
-
-    const failed = [];
-
-    for (let i = 0; i < queue.length; i++) {
-      const item = queue[i];
-      try {
-        const result = await sendLead(item);
-        if (result.status === 'rate_limit' || result.status === 'auth_error') {
-          failed.push(...queue.slice(i));
-          break;
+      function loadQueue() {
+        try {
+          const raw = localStorage.getItem(QUEUE_KEY);
+          return raw ? JSON.parse(raw) : [];
+        } catch (e) {
+          return [];
         }
-      } catch {
-        failed.push(item);
       }
-    }
 
-    saveQueue(failed);
-  }
+      function saveQueue(queue) {
+        try {
+          localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
+          return true;
+        } catch (e) {
+          return false;
+        }
+      }
 
-  try {
-    await flushQueue();
-  } catch {}
+      async function sendLeadToProxy(lead) {
+        const response = await fetch(PROXY_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": API_KEY
+          },
+          body: JSON.stringify(lead)
+        });
 
-  try {
-    const result = await sendLead(lead);
-    document.body.innerText = JSON.stringify(result);
-  } catch {
-    const queue = loadQueue();
-    queue.push(lead);
-    saveQueue(queue);
+        const text = await response.text();
 
-    document.body.innerText = JSON.stringify({
-      status: 'queued',
-      message: `Sem conexão. Lead \"${lead.nome}\" salvo localmente. Total na fila: ${queue.length}.`,
-      na_fila: queue.length
-    });
-  }
-})();
-</script>
-</body>
+        let json;
+        try {
+          json = JSON.parse(text);
+        } catch (e) {
+          json = {
+            status: "error",
+            message: text || "Resposta inválida do servidor."
+          };
+        }
+
+        if (response.status === 401) {
+          return {
+            status: "auth_error",
+            message: json.error || json.message || "Chave inválida ou revogada."
+          };
+        }
+
+        if (response.status === 429) {
+          return {
+            status: "rate_limit",
+            message: json.error || json.message || "Limite diário atingido.",
+            enviados_hoje: json.enviados_hoje || null,
+            limite: json.limite || 500
+          };
+        }
+
+        if (!response.ok) {
+          return {
+            status: "error",
+            message: json.error || json.message || `Erro HTTP ${response.status}`,
+            detail: json.detail || null
+          };
+        }
+
+        return {
+          status: "ok",
+          message: json.message || "Lead enviado com sucesso.",
+          enviados_hoje: json.enviados_hoje || null,
+          limite_diario: json.limite_diario || 500,
+          task_id: json.task_id || null,
+          captado_por: json.captado_por || null
+        };
+      }
+
+      async function flushQueue() {
+        const queue = loadQueue();
+        if (!queue.length) {
+          return {
+            flushed: 0,
+            remaining: 0
+          };
+        }
+
+        const remaining = [];
+        let flushed = 0;
+
+        for (const item of queue) {
+          try {
+            const result = await sendLeadToProxy(item);
+
+            if (result.status === "ok") {
+              flushed += 1;
+              continue;
+            }
+
+            if (result.status === "rate_limit" || result.status === "auth_error") {
+              remaining.push(item);
+              const currentIndex = queue.indexOf(item);
+              remaining.push(...queue.slice(currentIndex + 1));
+              break;
+            }
+
+            remaining.push(item);
+          } catch (e) {
+            remaining.push(item);
+          }
+        }
+
+        saveQueue(remaining);
+
+        return {
+          flushed,
+          remaining: remaining.length
+        };
+      }
+
+      function validateLead(lead) {
+        if (!lead || typeof lead !== "object") {
+          return { valid: false, message: "Lead inválido." };
+        }
+
+        if (!lead.nome && !lead.telefone && !lead.email && !lead.site) {
+          return {
+            valid: false,
+            message: "Lead sem dados mínimos para envio."
+          };
+        }
+
+        return { valid: true };
+      }
+
+      window["ai_edge_gallery_get_result"] = async (data) => {
+        try {
+          let lead;
+
+          try {
+            lead = JSON.parse(data);
+          } catch (e) {
+            return JSON.stringify({
+              status: "error",
+              message: "Não foi possível interpretar o JSON enviado para a ação.",
+              detail: e.message
+            });
+          }
+
+          const validation = validateLead(lead);
+          if (!validation.valid) {
+            return JSON.stringify({
+              status: "error",
+              message: validation.message
+            });
+          }
+
+          const flushInfo = await flushQueue();
+
+          try {
+            const result = await sendLeadToProxy(lead);
+
+            return JSON.stringify({
+              ...result,
+              fila_enviada_antes: flushInfo.flushed,
+              fila_restante: flushInfo.remaining
+            });
+          } catch (e) {
+            const queue = loadQueue();
+            queue.push(lead);
+            saveQueue(queue);
+
+            return JSON.stringify({
+              status: "queued",
+              message: "Sem conexão ou falha temporária. Lead salvo localmente para reenviar depois.",
+              na_fila: queue.length,
+              fila_enviada_antes: flushInfo.flushed,
+              fila_restante: queue.length,
+              detail: e.message
+            });
+          }
+        } catch (e) {
+          return JSON.stringify({
+            status: "error",
+            message: "Falha inesperada ao processar a ação.",
+            detail: e.message
+          });
+        }
+      };
+    </script>
+  </body>
 </html>

@@ -49,9 +49,7 @@ Mostre um resumo legível e pergunte se está correto:
 "Está correto? Posso enviar ao ClickUp?"
 
 ### Passo 4 — Enviar ao ClickUp
-Após confirmação, chame a ferramenta `run_js` usando:
-- `index.html` como arquivo
-- `data` como uma string JSON válida
+Após confirmação, chame `run_js` usando `index.html` e envie `data` como uma string JSON válida contendo um único lead.
 
 Para cada lead, envie UM lead por vez neste formato:
 
