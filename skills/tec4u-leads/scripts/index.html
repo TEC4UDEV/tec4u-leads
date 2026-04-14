@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+</head>
+<body>
+<script>
+(async () => {
+  const PROXY_URL = 'https://SEU-PROJETO.vercel.app/api/lead';
+  const API_KEY = 'pk_SEU_USUARIO_AQUI';
+  const QUEUE_KEY = 'tec4u_leads_queue';
+
+  const params = new URLSearchParams(window.location.search);
+  let lead;
+  try {
+    lead = JSON.parse(decodeURIComponent(params.get('data') || '{}'));
+  } catch {
+    document.body.innerText = JSON.stringify({ status: 'error', message: 'Dados inválidos recebidos.' });
+    return;
+  }
+
+  function loadQueue() {
+    try { return JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]'); }
+    catch { return []; }
+  }
+
+  function saveQueue(queue) {
+    localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
+  }
+
+  async function sendLead(leadData) {
+    const res = await fetch(PROXY_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': API_KEY
+      },
+      body: JSON.stringify(leadData),
+      signal: AbortSignal.timeout(8000)
+    });
+
+    const json = await res.json();
+
+    if (res.status === 429) {
+      return {
+        status: 'rate_limit',
+        message: json.error,
+        enviados_hoje: json.enviados_hoje,
+        limite: json.limite
+      };
+    }
+
+    if (res.status === 401) {
+      return {
+        status: 'auth_error',
+        message: json.error
+      };
+    }
+
+    if (!res.ok) {
+      throw new Error(json.error || `HTTP ${res.status}`);
+    }
+
+    return {
+      status: 'ok',
+      message: json.message,
+      enviados_hoje: json.enviados_hoje,
+      limite_diario: json.limite_diario,
+      task_id: json.task_id
+    };
+  }
+
+  async function flushQueue() {
+    const queue = loadQueue();
+    if (!queue.length) return;
+
+    const failed = [];
+
+    for (let i = 0; i < queue.length; i++) {
+      const item = queue[i];
+      try {
+        const result = await sendLead(item);
+        if (result.status === 'rate_limit' || result.status === 'auth_error') {
+          failed.push(...queue.slice(i));
+          break;
+        }
+      } catch {
+        failed.push(item);
+      }
+    }
+
+    saveQueue(failed);
+  }
+
+  try {
+    await flushQueue();
+  } catch {}
+
+  try {
+    const result = await sendLead(lead);
+    document.body.innerText = JSON.stringify(result);
+  } catch {
+    const queue = loadQueue();
+    queue.push(lead);
+    saveQueue(queue);
+
+    document.body.innerText = JSON.stringify({
+      status: 'queued',
+      message: `Sem conexão. Lead \"${lead.nome}\" salvo localmente. Total na fila: ${queue.length}.`,
+      na_fila: queue.length
+    });
+  }
+})();
+</script>
+</body>
+</html>
