@@ -49,8 +49,23 @@ Mostre um resumo legível e pergunte se está correto:
 "Está correto? Posso enviar ao ClickUp?"
 
 ### Passo 4 — Enviar ao ClickUp
-Após confirmação, chame run_js com index.html para CADA lead individualmente,
-passando um JSON com: evento, nome, telefone, email, site, observacao.
+Após confirmação, chame a ferramenta `run_js` usando:
+- `index.html` como arquivo
+- `data` como uma string JSON válida
+
+Para cada lead, envie UM lead por vez neste formato:
+
+{
+  "evento": "NOME DO EVENTO",
+  "nome": "NOME COMPLETO",
+  "telefone": "+5511999999999",
+  "email": "email@dominio.com",
+  "site": null,
+  "observacao": "texto ou null"
+}
+
+Não envie vários leads juntos na mesma chamada da ferramenta.
+Não adicione texto fora do JSON ao campo `data`.
 
 Interprete a resposta da ferramenta:
 
