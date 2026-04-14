@@ -37,16 +37,19 @@ Mostre um resumo legível e pergunte se está correto:
 ```text
 📋 Leads encontrados:
 
-1. João Silva
-   📞 +5511999991234
-   📧 joao@empresa.com
-   🎪 FEBRATEX 2026
-   📝 Ligar segunda-feira
+1. João Silva - Empresa XYZ
+   Telefone: +5511999991234
+   E-mail: joao@empresaxyz.com
+   Empresa: Empresa XYZ
+   Site: www.empresa.com
+   Evento: FEBRATEX 2026
+   Observação: observação ou null
 
-2. Maria Souza
-   📞 +5521988887777
-   🎪 FEBRATEX 2026
+2. Maria Souza - Empresa YZZ
+   telefone: +5521988887777
+   E-mail: maria@empresayzz.com.br
 "Está correto? Posso enviar ao ClickUp?"
+```
 
 ### Passo 4 — Enviar ao ClickUp
 Após confirmação, chame `run_js` usando `index.html` e envie `data` como uma string JSON válida contendo um único lead.
@@ -55,10 +58,11 @@ Para cada lead, envie UM lead por vez neste formato:
 
 {
   "evento": "NOME DO EVENTO",
-  "nome": "NOME COMPLETO",
+  "empresa": "NOME DA EMPRESA",
+  "nome": "NOME COMPLETO - NOME DA EMPRESA",
   "telefone": "+5511999999999",
   "email": "email@dominio.com",
-  "site": null,
+  "site": "www.empresa.com ou null",
   "observacao": "texto ou null"
 }
 

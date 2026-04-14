@@ -132,7 +132,7 @@
           return { valid: false, message: "Lead inválido." };
         }
 
-        if (!lead.nome && !lead.telefone && !lead.email && !lead.site) {
+        if (!lead.nome && !lead.telefone && !lead.site) {
           return {
             valid: false,
             message: "Lead sem dados mínimos para envio."
